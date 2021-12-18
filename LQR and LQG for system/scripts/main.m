@@ -1,4 +1,4 @@
-clear all;clc;
+clear all; clc;
 % Defining variables for the system
 syms M m_1 l_1 m_2 l_2 g 
 
@@ -92,4 +92,154 @@ rank_obsv_C4 = rank(obsv_matrix_C4); % output = 6 ==> observable
 
 %% PART F: Plot the Luenberger Response for the output vectors which were observable
 %% Observer based Control
-P = [-0.04 -0.05 -0.06 -0.07 -0.08 -0.09]; % expected poles
+%% Kalman Estimator Design
+%% Obtaining Luenberger Observers for output vectors of each observable(Using Kalman Bucy Filter (Lqe))
+%Introducing Noise and Disturbances in the system
+Bd = 0.01.*eye(6);             %input disturbance covariance
+Bn = 0.1;
+Bn1 = 0.1;                      %output measurement noise for each case
+Bn3 = 0.1*[0,1;0,1];
+Bn4 = 0.1*[0,0,1;0,0,1;0,0,1];
+
+%%
+% system
+[Lb1] = lqe(A,Bd,C1,Bd,Bn);
+[Lb3] = lqe(A,Bd,C3,Bd,Bn*eye(2));
+[Lb4] = lqe(A,Bd,C4,Bd,Bn*eye(3));
+
+% Creating Augmented Matrices for Simulation
+uD = randn(6,size(tspan,2));      %input for disturbance
+uN = randn(size(tspan));          %input for noise
+u = 0*tspan;
+u(200:length(tspan)) = 1;      % Step input at t = 10
+u1 = [u; Bd*Bd*uD; uN];
+
+Be = [B,Bd,zeros(size(B))];  %Augmented B matrix
+
+%% Luenberger Observer with State Estimator for C1 = [1,0,0,0,0,0] Kalman Filter
+
+sysLO1 = ss(A-Lb1*C1,[B Lb1],C1,zeros(1,2));     %State Estimator system
+
+%Obtaining Y values for a system simulated with noise and disturbance. 
+De1 = [0, 0 ,0, 0, 0, 0, 0, Bn1];                     %Augmented D matrix
+
+sys1 = ss(A,Be,C1,De1);
+[y1,t] = lsim(sys1,u1,tspan);
+
+%Simulating the States of the output variables 
+[x1,t] = lsim(sysLO1,[u; y1'],tspan);
+
+figure();
+hold on
+plot(t,y1(:,1),'r','Linewidth',1)
+plot(t,x1(:,1),'y--','Linewidth',1)
+ylabel('x-position of cart')
+xlabel('time in s')
+legend('Output obtained from noisy system','Estimated output of the system')
+title('Estimated Response for C1: output vector x(t) - Linear System')
+hold off
+
+% opt = simset('solver','ode45','SrcWorkspace','Current');
+% [tout2]=sim('nonlinerLO',tspan,opt);
+% figure();
+% hold on
+% plot(tout2,out1(:,1),'r','Linewidth',2)
+% plot(tout2,states1(:,1),'k--','Linewidth',2)
+% ylabel('x-position of cart')
+% xlabel('time in s')
+% legend('Output obtained from noisy system','Estimated output of the system')
+% title('Estimated Response for C1: output vector x(t) - Nonlinear System')
+% hold off
+
+%% Luenberger Observer with State Estimator for C3: For output (x(t),t2(t))- Kalman Filter
+
+sysLO3 = ss(A-Lb3*C3,[B Lb3],C3,zeros(2,3));     %State Estimator system
+
+%Obtaining Y values for a system simulated with noise and disturbance. 
+De3 = [zeros(size(C3)),Bn3];                     %Augmented D matrix
+
+sys3 = ss(A,Be,C3,De3);
+[y3,t] = lsim(sys3,u1,tspan);
+
+%Simulating the States of the output variables 
+[x3,t] = lsim(sysLO3,[u; y3'],tspan);
+
+figure();
+hold on
+plot(t,y3(:,1),'g','Linewidth',2)
+plot(t,y3(:,2),'b','Linewidth',2)
+plot(t,x3(:,1),'k--','Linewidth',1)
+plot(t,x3(:,2),'r--','Linewidth',1)
+ylabel('State Variables ')
+xlabel('time in s')
+legend('Noisy output x(t)','Noisy output theta2(t)','Estimated x(t)','Estimated theta2(t)')
+title('Estimated Response for C3: output vector (x(t),t2(t))')
+hold off
+
+opt = simset('solver','ode45','SrcWorkspace','Current');
+[tout3]=sim('nonlinearLO3',tspan,opt);
+figure();
+hold on
+plot(tout3,out3(:,1),'r','Linewidth',2)
+plot(tout3,out3(:,2),'g','Linewidth',2)
+plot(t,states3(:,1),'k--','Linewidth',1)
+plot(t,states3(:,2),'r--','Linewidth',1)
+ylabel('x-position of cart')
+xlabel('time in s')
+legend('Noisy output x(t)','Noisy output theta2(t)','Estimated x(t)','Estimated theta2(t)')
+title('Estimated Response for C3: output vector (x(t),t2(t)) - Nonlinear System')
+hold off
+
+%% Luenberger Observer with State Estimator for C4: For output (x(t),t1(t),t2(t)) - Kalman Filter
+
+sysLO4 = ss(A-Lb4*C4,[B Lb4],C4,zeros(3,4));     %State Estimator system
+
+%Obtaining Y values for a system simulated with noise and disturbance. 
+De4 = [zeros(3,5),Bn4];                     %Augmented D matrix
+
+sys4 = ss(A,Be,C4,De4);
+[y4,t] = lsim(sys4,u1,tspan);
+
+%Simulating the States of the output variables 
+[x4,t] = lsim(sysLO4,[u;y4'],tspan);
+
+figure();
+hold on
+plot(t,y4(:,1),'g','Linewidth',2)
+plot(t,y4(:,2),'b','Linewidth',3)
+plot(t,y4(:,3),'c','Linewidth',2)
+plot(t,x4(:,1),'m--','Linewidth',1)
+plot(t,x4(:,2),'r--','Linewidth',2)
+plot(t,x4(:,3),'k--','Linewidth',1)
+ylabel('State Variables ')
+xlabel('time in s')
+legend('Noisy output x(t)','Noisy output theta1(t)','Noisy output theta2(t)','Estimated x(t)','Estimated theta1(t)','Estimated theta2(t)')
+title('Estimated Response for C4: output vector (x(t),t1(t),t2(t))')
+hold off
+
+opt = simset('solver','ode45','SrcWorkspace','Current');
+[tout4]=sim('nonlinearLO4',tspan,opt);
+
+figure();
+hold on
+plot(tout4,out4(:,1),'g','Linewidth',2)
+plot(tout4,out4(:,2),'b','Linewidth',3)
+plot(tout4,out4(:,3),'c','Linewidth',2)
+plot(tout4,states4(:,1),'m--','Linewidth',1)
+plot(tout4,states4(:,2),'r--','Linewidth',2)
+plot(tout4,states4(:,3),'k--','Linewidth',1)
+ylabel('State Variables ')
+xlabel('time in s')
+legend('Noisy output x(t)','Noisy output theta1(t)','Noisy output theta2(t)','Estimated x(t)','Estimated theta1(t)','Estimated theta2(t)')
+title('Estimated Response for C4: output vector (x(t),t1(t),t2(t))')
+hold off
+
+%% LQG Controller for Output Vector C1 = [1,0,0,0,0,0]
+
+Ac = A-Lb1*C1;
+Bc = [B Lb1];
+Cc = eye(6);
+Dc = 0*[B Lb1];
+
+opt = simset('solver','ode45','SrcWorkspace','Current');
+[tout]=sim('nonlinearlqg',tspan,opt);
