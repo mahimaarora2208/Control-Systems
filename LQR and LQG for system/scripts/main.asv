@@ -1,0 +1,95 @@
+clear all;clc;
+% Defining variables for the system
+syms M m_1 l_1 m_2 l_2 g 
+
+%Values for system variables
+M = 1000;
+m_1= 100;
+l_1= 100;
+m_2 = 20;
+l_2= 10;
+g = 9.8;
+tspan = 0:0.1:200; % time span for simulation
+y0 = [1; 0; 0; 0; 0; 0];  % Initial conditions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%% FIRST COMPONENT %%%%
+
+%% PART A , B and C ==> Calculations in Report 
+
+%% PART D 
+% Linearized model state variable matrix
+A=[0 1 0 0 0 0 ; 0 0 -(m_1*g)/M 0 -(m_2*g)/M 0 ; 0 0 0 1 0 0 ; 0 0 -(M + m_1)*g/(M*l_1) 0 -(m_2*g)/(M*l_1) 0 ; 0 0 0 0 0 1;
+    0 0 -(m_1*g)/(M*l_2) 0 -(M + m_2)*g/(M*l_2) 0];
+B=[0 ; 1/M; 0; 1/(M*l_1) ; 0 ; 1/(M*l_2)];
+C=[1 0 0 0 0 0 ; 0 0 1 0 0 0 ; 0 0 0 0 1 0];
+D=[0 ; 0 ; 0];
+sys_1 = ss(A,B,C,D);
+
+% Controllability Matrix
+ctrb_matrix = ctrb(A,B);
+rank_ctrb_matrix = rank(ctrb_matrix);  % Rank = number of columns(6) ==> controllable
+
+% Observability Matrix
+obsv_matrix = obsv(A,C);
+rank_obsv_matrix = rank(obsv_matrix);  % Rank = number of columns(6) ==> observable
+
+%% LQR Controller implementation 
+
+R=0.0001;
+Q = diag([100,10,5000000,1000,1000000,1000]); %Most stable 
+F =0.5*ones(size(tspan));
+
+% Q(1,1)=1000;
+% Q(3,3)=50;
+% Q(5,5)=30;
+
+%% LQR controller for Linear System 
+[K_closed,S,e_closed] = lqr(A,B,Q,R); % Returns closed loop gains, S (in ricatti eqn) and closed loop eigen values
+A_closed = A - B*K_closed;
+
+m1,m2,L1,L2,Z,U
+[t,y1] = ode45(@(t,y)linear_system(m_1,m_2,) ,tspan,y0);
+figure;
+hold on
+plot(t,y1(:,1),'g')
+plot(t,y1(:,3),'b')
+plot(t,y1(:,5),'r')
+ylabel('state variables')
+xlabel('time(sec)')
+title('LQR response for linear system')
+legend('x_{cart}','theta1','theta2')
+
+
+%% LQR controller for Non-Linear System 
+[t,y2] = ode45(@(t,y)nonlinear_system(t, y, -K_closed*y, m_1, m_2, l_1, l_2, M),tspan,y0);
+figure(2);
+hold on
+plot(t,y2(:,1))
+plot(t,y2(:,3))
+plot(t,y2(:,5))
+ylabel('state variables')
+xlabel('time (sec)')
+title('LQR response for non - linear system')
+legend('x','theta1','theta2')
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%% SECOND COMPONENT %%%%
+%% PART E 
+C1 = [1 0 0 0 0 0];    %For output (x(t))
+C2 = [0 0 1 0 0 0; 0 0 0 0 1 0];   %For output (theta_1(t),theta_2(t))       
+C3 = [1 0 0 0 0 0;  0 0 0 0 1 0];  %For output (x(t),theta_2(t))        
+C4 = [1 0 0 0 0 0;  0 0 1 0 0 0;    0 0 0 0 1 0]; %For output (x(t),theta_1(t),theta_2(t))
+
+% Check observability for each case of C
+obsv_matrix_C1 = obsv(A,C1);  
+rank_obsv_C1 = rank(obsv_matrix_C1); % output = 6 ==> observable
+obsv_matrix_C2 = obsv(A,C2);
+rank_obsv_C2 = rank(obsv_matrix_C2); % output = 4 ==> Not observable
+obsv_matrix_C3 = obsv(A,C3);
+rank_obsv_C3 = rank(obsv_matrix_C3); % output = 6 ==> observable
+obsv_matrix_C4 = obsv(A,C4);
+rank_obsv_C4 = rank(obsv_matrix_C4); % output = 6 ==> observable
+
+%% PART F: Plot the Luenberger Response for the output vectors which were observable
+%% Observer based Control
+P = [-0.04 -0.05 -0.06 -0.07 -0.08 -0.09]; % expected poles
